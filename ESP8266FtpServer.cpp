@@ -207,10 +207,10 @@ bool FtpServer::processCommand() {
   }
   if (!strcmp(command, "CWD")) {
     //  CWD - Change Working Directory
-    if (strcmp(parameters, ".") == 0)  // 'CWD .' is the same as PWD command
+    if (strcmp(parameters, ".") == 0) {  // 'CWD .' is the same as PWD command
       client.println(
           "257 \"" + String(cwdName) + "\" is your current directory");
-    else {
+    } else {
       client.println("250 Ok. Current directory is " + String(cwdName));
     }
     return true;
@@ -231,7 +231,7 @@ bool FtpServer::processCommand() {
     if (!strcmp(parameters, "S")) {
       client.println("200 S Ok");
     } else {
-      client.println("504 Only S(tream) is suported");
+      client.println("504 Only S(tream) is supported");
     }
     return true;
   }
@@ -281,7 +281,7 @@ bool FtpServer::processCommand() {
     if (!strcmp(parameters, "F")) {
       client.println("200 F Ok");
     } else {
-      client.println("504 Only F(ile) is suported");
+      client.println("504 Only F(ile) is supported");
     }
     return true;
   }
@@ -330,9 +330,9 @@ bool FtpServer::processCommand() {
       client.println("150 Accepted data connection");
       uint16_t nm = 0;
       Dir dir = SPIFFS.openDir(cwdName);
-      if (!SPIFFS.exists(cwdName))
+      if (!SPIFFS.exists(cwdName)) {
         client.println("550 Can't open directory " + String(cwdName));
-      else {
+      } else {
         while (dir.next()) {
           String fn, fs;
           fn = dir.fileName();
@@ -378,9 +378,9 @@ bool FtpServer::processCommand() {
       client.println("150 Accepted data connection");
       uint16_t nm = 0;
       Dir dir = SPIFFS.openDir(cwdName);
-      if (!SPIFFS.exists(cwdName))
+      if (!SPIFFS.exists(cwdName)) {
         client.println("550 Can't open directory " + String(parameters));
-      else {
+      } else {
         while (dir.next()) {
           data.println(dir.fileName());
           nm++;
@@ -398,17 +398,17 @@ bool FtpServer::processCommand() {
   if (!strcmp(command, "RETR")) {
     //  RETR - Retrieve
     char path[ FTP_CWD_SIZE];
-    if (strlen(parameters) == 0)
+    if (strlen(parameters) == 0) {
       client.println("501 No file name");
-    else if (makePath(path)) {
+    } else if (makePath(path)) {
       file = SPIFFS.open(path, "r");
-      if (!file)
+      if (!file) {
         client.println("550 File " + String(parameters) + " not found");
-      else if (!file)
+      } else if (!file) {
         client.println("450 Can't open " + String(parameters));
-      else if (!dataConnect())
+      } else if (!dataConnect()) {
         client.println("425 No data connection");
-      else {
+      } else {
         FTP_DEBUG.println("Sending " + String(parameters));
         client.println("150-Connected to port " + String(dataPort));
         client.println("150 " + String(file.size()) + " bytes to download");
@@ -457,9 +457,9 @@ bool FtpServer::processCommand() {
     if (strlen(parameters) == 0) {
       client.println("501 No file name");
     } else if (makePath(buf)) {
-      if (!SPIFFS.exists(buf))
+      if (!SPIFFS.exists(buf)) {
         client.println("550 File " + String(parameters) + " not found");
-      else {
+      } else {
         FTP_DEBUG.println("Renaming " + String(buf));
         client.println(
             "350 RNFR accepted - file exists, ready for destination");
@@ -494,7 +494,7 @@ bool FtpServer::processCommand() {
   // Extension commands (RFC 3659)
   if (!strcmp(command, "FEAT")) {
     //  FEAT - New Features
-    client.println("211-Extensions suported:");
+    client.println("211-Extensions supported:");
     client.println(" MLSD");
     client.println("211 End.");
     return true;
@@ -633,26 +633,27 @@ int8_t FtpServer::readChar() {
         command[0] = 0;
         parameters = NULL;
         // empty line?
-        if (iCL == 0)
+        if (iCL == 0) {
           rc = 0;
-        else {
+        } else {
           rc = iCL;
           // search for space between command and parameters
           parameters = strchr(cmdLine, ' ');
           if (parameters != NULL) {
-            if (parameters - cmdLine > 4)
+            if (parameters - cmdLine > 4) {
               rc = -2; // Syntax error
-            else {
+            } else {
               strncpy(command, cmdLine, parameters - cmdLine);
               command[parameters - cmdLine] = 0;
 
-              while (*(++parameters) == ' ')
-                ;
+              while (*(++parameters) == ' ') {
+              }
             }
-          } else if (strlen(cmdLine) > 4)
+          } else if (strlen(cmdLine) > 4) {
             rc = -2; // Syntax error.
-          else
+          } else {
             strcpy(command, cmdLine);
+          }
           iCL = 0;
         }
       }
