@@ -22,8 +22,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Uncomment to print debugging info to console attached to ESP8266
-// #define FTP_DEBUG
 #include "ESP8266FtpServer.h"
 
 #include <ESP8266WiFi.h>
@@ -31,11 +29,26 @@
 #include <ESP8266WebServer.h>
 #include <FS.h>
 
-// TODO(mogo): Move to instance variables.
-WiFiServer ftpServer(FTP_CTRL_PORT);
-WiFiServer dataServer(FTP_DATA_PORT_PASV);
+// Comment/Uncomment the line below to disable/enable debug to serial port.
+#define FTP_DEBUG Serial
 
-void FtpServer::begin(String uname, String pword) {
+#ifndef FTP_DEBUG
+struct {
+  static void println(const char*) {
+  }
+  static void println(const String&) {
+  }
+  static void print(char) {
+  }
+} NullDebug;
+#define FTP_DEBUG NullDebug
+#endif  // FTP_DEBUG
+
+FtpServer::FtpServer() :
+    ftpServer(FTP_CTRL_PORT), dataServer(FTP_DATA_PORT_PASV) {
+}
+
+void FtpServer::setup(String uname, String pword) {
   // Tells the ftp server to begin listening for incoming connection
   _FTP_USER = uname;
   _FTP_PASS = pword;
@@ -64,7 +77,7 @@ void FtpServer::iniVariables() {
   transferStatus = 0;
 }
 
-void FtpServer::handleFTP() {
+void FtpServer::loop() {
   if ((int32_t) (millisDelay - millis()) > 0) {
     return;
   }
@@ -83,9 +96,8 @@ void FtpServer::handleFTP() {
     // Ftp server waiting for connection
     abortTransfer();
     iniVariables();
-#ifdef FTP_DEBUG
-    Serial.println("Ftp server waiting for connection on port "+ String(FTP_CTRL_PORT));
-#endif
+    FTP_DEBUG.println(
+        "Ftp server waiting for connection on port " + String(FTP_CTRL_PORT));
     cmdStatus = 2;
   } else if (cmdStatus == 2) {
     // Ftp server idle
@@ -122,9 +134,7 @@ void FtpServer::handleFTP() {
     }
   } else if (!client.connected() || !client) {
     cmdStatus = 1;
-#ifdef FTP_DEBUG
-    Serial.println("client disconnected");
-#endif
+    FTP_DEBUG.println("client disconnected");
   }
 
   if (transferStatus == 1) {
@@ -146,9 +156,7 @@ void FtpServer::handleFTP() {
 }
 
 void FtpServer::clientConnected() {
-#ifdef FTP_DEBUG
-  Serial.println("Client connected!");
-#endif
+  FTP_DEBUG.println("Client connected!");
   client.println("220--- Welcome to FTP for ESP8266 ---");
   client.println("220---   By David Paiva   ---");
   client.println("220 --   Version " + String(FTP_SERVER_VERSION) + "   --");
@@ -156,9 +164,7 @@ void FtpServer::clientConnected() {
 }
 
 void FtpServer::disconnectClient() {
-#ifdef FTP_DEBUG
-  Serial.println(" Disconnecting client");
-#endif
+  FTP_DEBUG.println(" Disconnecting client");
   abortTransfer();
   client.println("221 Goodbye");
   client.stop();
@@ -184,9 +190,7 @@ bool FtpServer::userPassword() {
   } else if (strcmp(parameters, _FTP_PASS.c_str())) {
     client.println("530 ");
   } else {
-#ifdef FTP_DEBUG
-    Serial.println( "OK. Waiting for commands.");
-#endif
+    FTP_DEBUG.println("OK. Waiting for commands.");
     client.println("230 OK.");
     return true;
   }
@@ -203,7 +207,6 @@ bool FtpServer::processCommand() {
   }
   if (!strcmp(command, "CWD")) {
     //  CWD - Change Working Directory
-    char path[ FTP_CWD_SIZE];
     if (strcmp(parameters, ".") == 0)  // 'CWD .' is the same as PWD command
       client.println(
           "257 \"" + String(cwdName) + "\" is your current directory");
@@ -239,10 +242,8 @@ bool FtpServer::processCommand() {
     }
     dataIp = WiFi.localIP();
     dataPort = FTP_DATA_PORT_PASV;
-#ifdef FTP_DEBUG
-    Serial.println("Connection management set to passive");
-    Serial.println( "Data port set to " + String(dataPort));
-#endif
+    FTP_DEBUG.println("Connection management set to passive");
+    FTP_DEBUG.println("Data port set to " + String(dataPort));
     client.println(
         "227 Entering Passive Mode (" + String(dataIp[0]) + ","
             + String(dataIp[1]) + "," + String(dataIp[2]) + ","
@@ -355,7 +356,6 @@ bool FtpServer::processCommand() {
       client.println("150 Accepted data connection");
       uint16_t nm = 0;
       Dir dir = SPIFFS.openDir(cwdName);
-      char dtStr[15];
       while (dir.next()) {
         String fn, fs;
         fn = dir.fileName();
@@ -409,9 +409,7 @@ bool FtpServer::processCommand() {
       else if (!dataConnect())
         client.println("425 No data connection");
       else {
-#ifdef FTP_DEBUG
-        Serial.println("Sending " + String(parameters));
-#endif
+        FTP_DEBUG.println("Sending " + String(parameters));
         client.println("150-Connected to port " + String(dataPort));
         client.println("150 " + String(file.size()) + " bytes to download");
         millisBeginTrans = millis();
@@ -434,9 +432,7 @@ bool FtpServer::processCommand() {
         client.println("425 No data connection");
         file.close();
       } else {
-#ifdef FTP_DEBUG
-        Serial.println( "Receiving " +String(parameters));
-#endif
+        FTP_DEBUG.println("Receiving " + String(parameters));
         client.println("150 Connected to port " + String(dataPort));
         millisBeginTrans = millis();
         bytesTransfered = 0;
@@ -464,9 +460,7 @@ bool FtpServer::processCommand() {
       if (!SPIFFS.exists(buf))
         client.println("550 File " + String(parameters) + " not found");
       else {
-#ifdef FTP_DEBUG
-        Serial.println("Renaming " + String(buf));
-#endif
+        FTP_DEBUG.println("Renaming " + String(buf));
         client.println(
             "350 RNFR accepted - file exists, ready for destination");
         rnfrCmd = true;
@@ -477,7 +471,6 @@ bool FtpServer::processCommand() {
   if (!strcmp(command, "RNTO")) {
     // RNTO - Rename To
     char path[ FTP_CWD_SIZE];
-    char dir[ FTP_FIL_SIZE];
     if (strlen(buf) == 0 || !rnfrCmd) {
       client.println("503 Need RNFR before RNTO");
     } else if (strlen(parameters) == 0) {
@@ -486,9 +479,7 @@ bool FtpServer::processCommand() {
       if (SPIFFS.exists(path)) {
         client.println("553 " + String(parameters) + " already exists");
       } else {
-#ifdef FTP_DEBUG
-        Serial.println("Renaming " + String(buf) + " to " + String(path));
-#endif
+        FTP_DEBUG.println("Renaming " + String(buf) + " to " + String(path));
         if (SPIFFS.rename(buf, path))
           client.println("250 File successfully renamed or moved");
         else
@@ -552,10 +543,7 @@ bool FtpServer::dataConnect() {
     if (dataServer.hasClient()) {
       data.stop();
       data = dataServer.available();
-#ifdef FTP_DEBUG
-      Serial.println("ftpdataserver client....");
-#endif
-
+      FTP_DEBUG.println("ftpdataserver client....");
     }
   }
   return data.connected();
@@ -607,9 +595,7 @@ void FtpServer::abortTransfer() {
     file.close();
     data.stop();
     client.println("426 Transfer aborted");
-#ifdef FTP_DEBUG
-    Serial.println( "Transfer aborted!");
-#endif
+    FTP_DEBUG.println("Transfer aborted!");
   }
   transferStatus = 0;
 }
@@ -631,9 +617,7 @@ int8_t FtpServer::readChar() {
     char c = client.read();
     // char c;
     // client.readBytes((uint8_t*) c, 1);
-#ifdef FTP_DEBUG
-    Serial.print( c);
-#endif
+    FTP_DEBUG.print(c);
     if (c == '\\') {
       c = '/';
     }
