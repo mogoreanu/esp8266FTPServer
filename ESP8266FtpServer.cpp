@@ -29,7 +29,7 @@
 #include <ESP8266WebServer.h>
 #include <FS.h>
 
-// Comment/Uncomment the line below to disable/enable debug to serial port.
+// Uncomment the line below to enable debug to serial port.
 #define FTP_DEBUG Serial
 
 #ifndef FTP_DEBUG
